@@ -797,7 +797,7 @@ necessary).
 
 =cut
 
-sub set_address() {
+sub set_address {
     my ($self, $address) = @_;
     $self->{port}->write("m$address");
     my $response = get_response($self);
@@ -808,6 +808,33 @@ sub set_address() {
     $_ =~ s/^0+// for $address, $value;
     confess "Address returned ($value) differs from address sent ($address)!" 
         unless $address == $value;
+}
+
+=head2 replay(commands)
+
+replay() allows to run a command sequence as if it was called with HyCon methods.
+This can be useful if you constructed the hybrid controller commands by yourself
+but now want to use HyCon to ensure they are transfered correctly and the
+response is checked.
+
+Usage of this method looks like this:
+
+    $ac->replay("P80010000P80020000D800D801D802");
+    $ac->replay(`cat a-file-with-commands.txt`);
+
+=cut
+
+sub replay {
+    my ($self, $command) = @_;
+    $_ = $command;
+    while (length) {
+        if (s/^c(\d{6})//) { $self->set_op_time($1); next }
+        if (s/^C(\d{6})//) { $self->set_ic_time($1); next }
+        if (s/^d([0-7])//) { $self->digital_output($1, false); next }
+        if (s/^D([0-7])//) { $self->digital_output($1, true); next }
+        if (s/^P(\d)(\d{4})//) { $self->set_pt($1, $2/(2 ** $self->{builtin_dpt}{resolution} - 1)); next }
+        croak "Cannot continue replay because don't understand beginning of $_";
+    }
 }
 
 =head1 Examples
